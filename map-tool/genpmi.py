@@ -571,13 +571,8 @@ def GenerateNodeInfoTables():
                 nodesByCountry[pnode['location']['country']].append(pnode)
     nbcFilename = "nodes-by-country-{net}.txt".format(net="mainnet" if args.mainnet else "testnet")
     with open(nbcFilename, "w") as f:
+        print(f"# This data was collected at: {datetime.datetime.utcnow()} UTC", file=f)
         for country in sorted(countries):
-#            for nodetype in ['full', 'seed', 'producer']:
-#                present = False
-#                for pnode in sorted(nodesByCountry[country], key = lambda t: (t['timestamp'])):
-#                    if pnode['node_type'] == nodetype:
-#                        present = True
-#                        print(f"{country} {pnode['node_type']} {pnode['timestamp']} {pnode['producer']} {pnode['location']['latitude']} {pnode['location']['longitude']}", file=f)
             for pnode in sorted(nodesByCountry[country], key = lambda t: (t['timestamp'])):
                 print(f"{country} {pnode['node_type']} {pnode['timestamp']} {pnode['producer']} {pnode['location']['latitude']} {pnode['location']['longitude']}", file=f)
 
