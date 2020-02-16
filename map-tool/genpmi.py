@@ -13,13 +13,13 @@ import time
 import os
 
 # The maximum age of the producers JSON file in seconds before we attempt to update it.
-PRODUCERS_FILE_MAXAGE = 36000
+PRODUCERS_FILE_MAXAGE = 3600
 # The maximum age of the top21 JSON file in seconds before we attempt to update it.
-TOP21_FILE_MAXAGE = 36000
+TOP21_FILE_MAXAGE = 3600
 # The maximum age of the producerjson-actions JSON file in seconds before we attempt to update it.
-PRODUCERJSON_ACTIONS_FILE_MAXAGE = 36000
+PRODUCERJSON_ACTIONS_FILE_MAXAGE = 3600
 # The maximum age of the urls-last-checked file in seconds before allowing to recheck the bp.json URLs
-URLSLASTCHECKED_FILE_MAXAGE = 36000
+URLSLASTCHECKED_FILE_MAXAGE = 3600
 
 def fileExists(filename):
     return os.path.exists(filename) and os.path.isfile(filename)
@@ -227,10 +227,9 @@ def GetBPJSONs(historyURL, producers, force=False):
         os.mknod(URLSLastCheckedFilename())
     return bpjsons
 
-# TODO: Turn around GetLogo/UpdateLogo
-def GetLogo(p):
+def UpdateLogo(source, p, force):
     logo = {}
-    bpjson = bpjsons['url'][p]
+    bpjson = bpjsons[source][p]
     if 'org' in bpjson:
         if 'branding' in bpjson['org']:
             if 'logo_256' in bpjson['org']['branding']:
@@ -239,46 +238,32 @@ def GetLogo(p):
                     ext = requests.utils.urlparse(url).path.split('.')[-1]
                     filename = ProducerLogoFilename(p)
                     logoFile = f"{filename}.{ext}"
-                    if os.path.exists(logoFile):
-                        logo = logoFile
-                else:
-                    print(f"{p}: the org.branding.logo_256 url is empty in org.branding")
-            else:
-                print(f"{p}: org.branding.logo_256 is missing from the url bp.json cache")
-        else:
-            print(f"{p}: org.branding is missing from the url bp.json cache")
-    else:
-        print(f"{p}: org is missing from the url bp.json cache")
-    return logo
-
-def UpdateLogo(p):
-    logo = {}
-    bpjson = bpjsons['url'][p]
-    if 'org' in bpjson:
-        if 'branding' in bpjson['org']:
-            if 'logo_256' in bpjson['org']['branding']:
-                url = bpjson['org']['branding']['logo_256']
-                if len(url):
-                    ext = requests.utils.urlparse(url).path.split('.')[-1]
-                    filename = ProducerLogoFilename(p)
-                    logoFile = f"{filename}.{ext}"
-                    updateLogoFile = False
-                    urlTime = ''
-                    try:
-                        fileMTime = datetime.datetime.utcfromtimestamp(os.path.getmtime(logoFile))
-                        r = requests.head(url)
-                        if 'Last-Modified' in r.headers:
-                            urlTime = r.headers['Last-Modified']
-                            urlDate = dateutil.parser.parse(urlTime, ignoretz=True)
-                            if urlDate > fileMTime:
-                                updateLogoFile = True
-                                print(f"{p}: the producers logo file is newer than the cache file")
-                        else:
-                            print(f"{p}: could not retrieve a Last-Modified value for the producer logo file")
-                            updateLogoFile = True
-                    except FileNotFoundError:
-                        print(f"{p}: url bp.json cache file ({logoFile}) is missing")
+                    if force:
+                        print(f"{p}: Force is True - removing the producer's cached url logo file - {logoFile}")
+                        try:
+                            os.remove(logoFile)
+                        except FileNotFoundError:
+                            pass
                         updateLogoFile = True
+                    else:
+                        updateLogoFile = False
+                        urlTime = ''
+                        try:
+                            fileMTime = datetime.datetime.utcfromtimestamp(os.path.getmtime(logoFile))
+                            r = requests.head(url)
+                            if 'Last-Modified' in r.headers:
+                                urlTime = r.headers['Last-Modified']
+                                urlDate = dateutil.parser.parse(urlTime, ignoretz=True)
+                                if urlDate > fileMTime:
+                                    updateLogoFile = True
+                                    print(f"{p}: the producers logo file is newer than the cache file")
+                            else:
+                                print(f"{p}: could not retrieve a Last-Modified value for the producer logo file")
+                                updateLogoFile = True
+                        except FileNotFoundError:
+                            print(f"{p}: url bp.json cache file ({logoFile}) is missing")
+                            updateLogoFile = True
+
                     if updateLogoFile:
                         print(f"{p}: updating logo cache file ({logoFile}) from {url}")
                         r = requests.get(url)
@@ -309,20 +294,11 @@ def UpdateLogo(p):
 
     return logo
 
-def UpdateLogos(source, producers, bpjsons):
+def GetLogos(source, producers, bpjsons, force=False):
     logos = {}
     for p in producers:
         if p in bpjsons[source]:
-            logo = UpdateLogo(p)
-            if logo:
-                logos[p] = logo
-    return logos
-
-def GetLogos(source, producers, bpjsons):
-    logos = {}
-    for p in producers:
-        if p in bpjsons[source]:
-            logo = GetLogo(p)
+            logo = UpdateLogo(source, p, force)
             if logo:
                 logos[p] = logo
     return logos
@@ -605,11 +581,8 @@ bpjsons = GetBPJSONs(historyURL, producers, force=(args.bpjsons or args.producer
 print("system: {total} url bp.json files in total for {net}".format(net="mainnet" if args.mainnet else "testnet", total=len(bpjsons['url'])))
 VerifyBPJSONs(bpjsons)
 
-if args.logos or args.bpjsons or args.producers:
-    logos = UpdateLogos('url', producers, bpjsons)
-else:
-    logos = GetLogos('url', producers, bpjsons)
-print("system: {total} cached logo files in total for {net}".format(net="mainnet" if args.mainnet else "testnet", total=len(logos)))
+logos = GetLogos('url', producers, bpjsons, force=(args.logos or args.bpjsons or args.producers))
+print("system: {total} logo files in total for {net}".format(net="mainnet" if args.mainnet else "testnet", total=len(logos)))
 
 if args.check:
     print("system: Checking consistency of the producer information...")
