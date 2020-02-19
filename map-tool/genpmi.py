@@ -206,7 +206,7 @@ def UpdateBPJSON(historyURL, source, p, force=False):
 
 def GetBPJSONs(historyURL, producers, force=False):
     bpjsons = {}
-    if fileOlderThan(URLSLastCheckedFilename(), URLSLASTCHECKED_FILE_MAXAGE):
+    if force or fileOlderThan(URLSLastCheckedFilename(), URLSLASTCHECKED_FILE_MAXAGE):
         try:
             os.remove(URLSLastCheckedFilename())
         except FileNotFoundError:
@@ -269,6 +269,8 @@ def UpdateLogo(source, p, force):
                         r = requests.get(url)
                         if 'Last-Modified' in r.headers:
                             urlTime = r.headers['Last-Modified']
+                        else:
+                            urlTime = ''
                         ct = r.headers['Content-Type']
                         ext = mimetypes.guess_extension(ct)
                         # I prefer to use jpg extension rather than jpe.  Which is what mimetimes normally returns.
