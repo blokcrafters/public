@@ -28,7 +28,7 @@ def fileOlderThan(filename, maxAge):
     return (not fileExists(filename)) or (int(os.path.getmtime(filename)) < (int(datetime.datetime.utcnow().timestamp()) - maxAge))
 
 def UpdateProducers(chainURL, producersFilename, top21Filename):
-    print(f"system: fetching the producers from {chainURL} ...")
+    print(f"system: fetching the producers from {chainURL} ...", file=log)
     numToGet = 50
     start = ''
     inactives = {}
@@ -46,13 +46,13 @@ def UpdateProducers(chainURL, producersFilename, top21Filename):
                 producers[p] = i
             else:
                 inactives[p] = i
-            if args.verbose: print(f"system: producer {len(producers) + len(inactives)}: {p}")
+            print(f"system: producer {len(producers) + len(inactives)}: {p}", file=log)
         start = someProducers['more']
         if len(start) <= 0:
             break
 
-    print(f"system: ... done.")
-    print(f"system: producers: {len(producers)} active and {len(inactives)} inactive")
+    print(f"system: ... done.", file=log)
+    print(f"system: producers: {len(producers)} active and {len(inactives)} inactive", file=log)
 
     # Get the Top21 producers
     info = subprocess.run(['cleos', '--url', chainURL, 'get', 'schedule', '--json'],
@@ -60,7 +60,7 @@ def UpdateProducers(chainURL, producersFilename, top21Filename):
     someJSON = json.loads(info.stdout)
     for p in someJSON['active']['producers']:
         top21.append(p['producer_name'])
-    print(f"system: top21 producers: {len(top21)}")
+    print(f"system: top21 producers: {len(top21)}", file=log)
 
     f = open(top21Filename, 'w')
     json.dump(top21, f, indent=2)
@@ -110,7 +110,7 @@ def UpdateBPJSON(historyURL, source, p, force=False):
         if len(url):
             filename = ProducerBPJSONFilename(source, p)
             if force:
-                print(f"{p}: Force is True - removing the producer's cached url bp.json file - {filename}")
+                print(f"{p}: Force is True - removing the producer's cached url bp.json file - {filename}", file=log)
                 try:
                     os.remove(filename)
                 except FileNotFoundError:
@@ -119,14 +119,14 @@ def UpdateBPJSON(historyURL, source, p, force=False):
             #  - we do not have a url file
             #  - the age of the urls-last-checked file is too old
             if fileOlderThan(URLSLastCheckedFilename(), URLSLASTCHECKED_FILE_MAXAGE):
-                if args.verbose: print(f"{p}: updating the {source} bp.json cache file from {url} ... ", end='')
+                print(f"{p}: updating the {source} bp.json cache file from {url} ... ", end='', file=log)
                 info = subprocess.run(['curl', '-RLSsf', '--connect-timeout', '5', '-z', filename, '-o', filename, url],
                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                 if info.returncode != 0:
-                    failReasons.append(f"FAIL: {url}: curl return code {info.returncode}: {info.stdout.decode('utf-8').rstrip()}")
-                    if args.verbose: print(f"failed")
+                    failReasons.append(f"{p}: FAIL: {url}: curl return code {info.returncode}: {info.stdout.decode('utf-8').rstrip()}")
+                    print(f"{p}: failed", file=log)
                 else:
-                    if args.verbose: print(f"success")
+                    print(f"{p}: success", file=log)
             if fileExists(filename):
                 with open(filename) as fh:
                     try:
@@ -138,23 +138,22 @@ def UpdateBPJSON(historyURL, source, p, force=False):
         theActions = {}
         # Force is handled before getting here for source == chain
         if  fileOlderThan(filename, PRODUCERJSON_ACTIONS_FILE_MAXAGE):
-            if args.verbose: print(f"{p}: updating the {source} producerjson-actions.json cache file from {historyURL} ... ", end='')
+            print(f"{p}: updating the {source} producerjson-actions.json cache file from {historyURL} ... ", end='', file=log)
             gaURL = historyURL + "/v2/history/get_actions?act.account=producerjson&limit=1000"
             info = subprocess.run(['curl', '-LSsf', '--connect-timeout', '5',
                 '-H', 'accept: application/json', '-H', 'Content-Type: application/json', gaURL],
                 stdout=subprocess.PIPE)
             if info.returncode != 0:
                 failReasons.append(f"FAIL: {url}: curl return code {info.returncode}: {info.stdout.decode('utf-8').rstrip()}")
-                if args.verbose: print(f"failed")
+                print(f"{p}: failed", file=log)
             else:
                 with open(filename, 'wb') as fh:
                     fh.write(info.stdout)
                 theActions = json.loads(info.stdout)
-                if args.verbose: print("success")
+                print(f"{p}: success", file=log)
         else:
             with open(filename) as fh:
                 theActions = json.load(fh)
-        if args.verbose: print(f"system: {len(theActions['actions'])} total producerjson actions on the chain")
 
         # Gather all the specific producer jsons from the actions into prodJSONs
         prodJSONs = {}
@@ -179,7 +178,7 @@ def UpdateBPJSON(historyURL, source, p, force=False):
                     failReasons.append(f"{p}: chain producerjson action data @{action['@timestamp']} could not be decoded as JSON")
             elif tsJSON['name'] == 'del':
                 prodJSONs[timestamp] = tsJSON
-        if args.verbose: print(f"system: {p} Has {len(prodJSONs)} producjerjson actions on the chain")
+        print(f"{p}: {len(prodJSONs)} producjerjson actions on the chain", file=log)
         if len(prodJSONs):
             for ts, action in sorted(prodJSONs.items(), reverse=True):
                 if action['name'] == 'del':
@@ -194,14 +193,14 @@ def UpdateBPJSON(historyURL, source, p, force=False):
 
     if len(bpjson) == 0:
         if source == 'url':
-            print(f"{p}: failed to retrieve url bp.json for the cache")
+            print(f"{p}: failed to retrieve url bp.json for the cache", file=log)
         elif source == 'chain':
-            if args.verbose or len(failReasons) > 0:
-                print(f"{p}: failed to retrieve chain bp.json data for the cache")
+            if len(failReasons) > 0:
+                print(f"{p}: failed to retrieve chain bp.json data for the cache", file=log)
                 if zeroActions:
                     failReasons.append(f"There are no producerjson action entries on the chain.")
         for reason in failReasons:
-            print(f"{p}: + {reason}")
+            print(f"{p}: + {reason}", file=log)
     return bpjson
 
 def GetBPJSONs(historyURL, producers, force=False):
@@ -239,7 +238,7 @@ def UpdateLogo(source, p, force):
                     filename = ProducerLogoFilename(p)
                     logoFile = f"{filename}.{ext}"
                     if force:
-                        print(f"{p}: Force is True - removing the producer's cached url logo file - {logoFile}")
+                        print(f"{p}: Force is True - removing the producer's cached url logo file - {logoFile}", file=log)
                         try:
                             os.remove(logoFile)
                         except FileNotFoundError:
@@ -256,16 +255,16 @@ def UpdateLogo(source, p, force):
                                 urlDate = dateutil.parser.parse(urlTime, ignoretz=True)
                                 if urlDate > fileMTime:
                                     updateLogoFile = True
-                                    print(f"{p}: the producers logo file is newer than the cache file")
+                                    print(f"{p}: the producers logo file is newer than the cache file", file=log)
                             else:
-                                print(f"{p}: could not retrieve a Last-Modified value for the producer logo file")
+                                print(f"{p}: could not retrieve a Last-Modified value for the producer logo file", file=log)
                                 updateLogoFile = True
                         except FileNotFoundError:
-                            print(f"{p}: url bp.json cache file ({logoFile}) is missing")
+                            print(f"{p}: url bp.json cache file ({logoFile}) is missing", file=log)
                             updateLogoFile = True
 
                     if updateLogoFile:
-                        print(f"{p}: updating logo cache file ({logoFile}) from {url}")
+                        print(f"{p}: updating logo cache file ({logoFile}) from {url}", file=log)
                         r = requests.get(url)
                         if 'Last-Modified' in r.headers:
                             urlTime = r.headers['Last-Modified']
@@ -286,13 +285,13 @@ def UpdateLogo(source, p, force):
                             # All good.
                             logo = logoFile
                 else:
-                    print(f"{p}: the org.branding.logo_256 url is empty in org.branding")
+                    print(f"{p}: the org.branding.logo_256 url is empty in org.branding", file=log)
             else:
-                print(f"{p}: org.branding.logo_256 is missing from the url bp.json cache")
+                print(f"{p}: org.branding.logo_256 is missing from the url bp.json cache", file=log)
         else:
-            print(f"{p}: org.branding is missing from the url bp.json cache")
+            print(f"{p}: org.branding is missing from the url bp.json cache", file=log)
     else:
-        print(f"{p}: org is missing from the url bp.json cache")
+        print(f"{p}: org is missing from the url bp.json cache", file=log)
 
     return logo
 
@@ -309,7 +308,7 @@ def VerifyProducers(producers):
     for p in producers:
         producer = producers[p]
         if len(producer['url']) == 0:
-            print(f"{p}: NOTE: the url field is empty.")
+            print(f"{p}: NOTE: the url field is empty.", file=log)
 
 # Does nothing at the moment.
 def VerifyBPJSONs(bpjsons):
@@ -318,14 +317,9 @@ def VerifyBPJSONs(bpjsons):
 
 # CHECK
 def CheckConsistency(producers, bpjsons, logos):
-    #
-    # Skip the WAX special place holder producers that have names ending in .wax
-    #
-    print(f"system: + {len(producers)} producers")
+    print(f"system: + {len(producers)} producers", file=log)
     regen = False
     for p in producers:
-        if p.endswith('.wax'):
-            continue
         producer = producers[p]
         missing = []
         display = False
@@ -334,7 +328,7 @@ def CheckConsistency(producers, bpjsons, logos):
         if p != producer['owner']:
             regen = True
             display = True
-            print(f"system: + CRIT: producer owner ({producer['owner']}) does not match producer name ({p})")
+            print(f"system: + CRIT: producer owner ({producer['owner']}) does not match producer name ({p})", file=log)
         if not producer['url']:
             missing.append('url')
         if not producer['location']:
@@ -342,38 +336,36 @@ def CheckConsistency(producers, bpjsons, logos):
         else:
             if not (str(producer['location']).zfill(3) in iso3166.countries_by_numeric):
                 display = True
-                print(f"system: + WARN: producer {p} has an invalid value {producer['location']} for a country code (see ISO3166)")
+                print(f"system: + WARN: producer {p} has an invalid value {producer['location']} for a country code (see ISO3166)", file=log)
         if len(missing):
             display = True
-            print(f"system: + WARN: producer {p} does not have settings for {missing}")
+            print(f"system: + WARN: producer {p} does not have settings for {missing}", file=log)
         if display:
-            print(f"system: + + producer = {producer}")
+            print(f"system: + + producer = {producer}", file=log)
     if regen:
-        print(f"system: + CRIT:   You need to regenerate the producer cache with the -p option")
+        print(f"system: + CRIT:   You need to regenerate the producer cache with the -p option", file=log)
 
     for source in ['url', 'chain']:
-        print(f"system: + {len(bpjsons[source])} url bp.json cache files")
+        print(f"system: + {len(bpjsons[source])} url bp.json cache files", file=log)
         regen = False
         for b in bpjsons[source]:
             bpjson = bpjsons[source][b]
-            if b.endswith('.wax'):
-                continue
 
             if b != bpjson['producer_account_name']:
-                print(f"system: + INFO: producer_account_name ({bpjson['producer_account_name']}) does not match producer name ({b})")
+                print(f"system: + INFO: producer_account_name ({bpjson['producer_account_name']}) does not match producer name ({b})", file=log)
 
             for node in bpjson['nodes']:
                 lat = node['location']['latitude']
                 lon = node['location']['longitude']
         if regen:
-            print(f"system: + CRIT:   You need to regenerate url bp.json cache files with the -b option")
+            print(f"system: + CRIT:   You need to regenerate url bp.json cache files with the -b option", file=log)
 
-    print(f"system: + {len(bpjsons['url'])} logo cache files")
+    print(f"system: + {len(bpjsons['url'])} logo cache files", file=log)
     regen = False
     for l in logos:
         logo = logos[l]
     if regen:
-        print(f"system: + CRIT:   You need to regenerate the logo cache files with the -l option")
+        print(f"system: + CRIT:   You need to regenerate the logo cache files with the -l option", file=log)
 
 def GetNodeTypes(bpjson, nodeType):
     nodes = []
@@ -454,7 +446,7 @@ def GenerateMapInfo(producers, bpjsons, logos):
         json.dump(mapInfo, f, indent=2)
         print(";", file=f)
         f.close()
-        print(f"system: generated {len(features[nt])} {nt} map markers")
+        print(f"system: generated {len(features[nt])} {nt} map markers", file=log)
 
     return
 
@@ -471,7 +463,6 @@ def GenerateNodeInfoTables():
     JSONActions = {}
     nodeActions = {}
     filename = ProducerBPJSONFilename('chain')
-    if args.verbose: print("success")
     with open(filename) as fh:
         JSONActions = json.load(fh)
     for action in JSONActions['actions']:
@@ -487,20 +478,20 @@ def GenerateNodeInfoTables():
                 nodeActions[timestamp] = tsJSON
             except json.decoder.JSONDecodeError:
                 actor = action['act']['authorization'][0]['actor']
-                print(f"system: chain producerjson action data @{action['@timestamp']} could not be decoded as JSON, actor={actor}")
+                print(f"system: chain producerjson action data @{action['@timestamp']} could not be decoded as JSON, actor={actor}", file=log)
         elif tsJSON['action'] == 'del':
             tsJSON['data'] = {'producer_account_name': action['act']['data']['owner']}
             nodeActions[timestamp] = tsJSON
         else:
-            print(f"system: found an unknown action on the producerjson actions: {tsJSON['name']}")
-    print(f"system: There are {len(nodeActions)} producerjson actions on the chain")
+            print(f"system: found an unknown action on the producerjson actions: {tsJSON['name']}", file=log)
+    print(f"system: There are {len(nodeActions)} producerjson actions on the chain", file=log)
     countries = set()
     producerNodes = {}
     for p in producers:
         producerActions = {}
         for ts, action in sorted(FilterNodeActionsByProducer(nodeActions, p).items()):
             producerActions[ts] = action
-        if len(producerActions): print(f"{p}: {len(producerActions)} node actions")
+        if len(producerActions): print(f"{p}: {len(producerActions)} node actions", file=log)
         producerNodes[p] = []
         for ts in producerActions:
             na = producerActions[ts]
@@ -536,10 +527,10 @@ def GenerateNodeInfoTables():
             elif action == 'del':
                 for pnode in producerNodes[p]:
                     pnode['deleted'] = ts
-            if len(unknowns): print(f"{p}: + has unknown node types: {unknowns}")
+            if len(unknowns): print(f"{p}: + has unknown node types: {unknowns}", file=log)
 
-    print(f"system: {len(countries)} countries have nodes in them.")
-    print(f"system: + countries={sorted(countries)}")
+    print(f"system: {len(countries)} countries have nodes in them.", file=log)
+    print(f"system: + countries={sorted(countries)}", file=log)
     nodesByCountry = {}
     for country in countries:
         nodesByCountry[country] = []
@@ -558,15 +549,21 @@ def GenerateNodeInfoTables():
 
 # MAIN
 parser = argparse.ArgumentParser()
-parser.add_argument("-b", "--bpjsons", help="Force an update to the cached producer bp.json files", action="store_true")
-parser.add_argument("-c", "--check", help="Check the consistency of the producer information", action="store_true")
-parser.add_argument("-l", "--logos", help="Force an update to the cached producer logo files", action="store_true")
-parser.add_argument("-p", "--producers", help="Force an update for the producers json file", action="store_true")
-parser.add_argument("-v", "--verbose", help="Be verbose while processing", action="store_true")
 group = parser.add_mutually_exclusive_group(required=True)
-group.add_argument("-m", "--mainnet", help="Work on the Mainnet", action="store_true")
-group.add_argument("-t", "--testnet", help="Work on the Testnet", action="store_true")
+group.add_argument("-m", "--mainnet", help="Process Mainnet", action="store_true")
+group.add_argument("-t", "--testnet", help="Process Testnet", action="store_true")
+parser.add_argument("-b", "--bpjsons", help="Force an update to the cached producer bp.json files", action="store_true")
+#parser.add_argument("-c", "--check", help="Check the consistency of the producer information", action="store_true")
+parser.add_argument("-l", "--logos", help="Force an update to the cached producer logo files", action="store_true")
+parser.add_argument("-p", "--producers", help="Force an update for the cached producers json file", action="store_true")
+#parser.add_argument("-v", "--verbose", help="Be verbose while processing", action="store_true")
+parser.add_argument("-o", "--output", help="Where to write the output log (default is stdout)")
 args = parser.parse_args()
+
+if args.output and len(args.output) > 0:
+    log = open(args.output, 'w')
+else:
+    log = sys.stdout
 
 #chainURL = "https://chain.wax.io" if args.mainnet else "https://testnet.waxsweden.org"
 #historyURL = "https://api.waxsweden.org" if args.mainnet else "https://testnet.waxsweden.org"
@@ -576,24 +573,26 @@ producersFilename = "{net}-jsons/producers.json".format(net="mainnet" if args.ma
 top21Filename = "{net}-jsons/top21.json".format(net="mainnet" if args.mainnet else "testnet")
 
 top21, producers = GetProducers(chainURL, producersFilename, top21Filename, force=args.producers)
-print("system: {total} producers in total for {net}".format(net="mainnet" if args.mainnet else "testnet", total=len(producers)))
+print("system: {total} producers in total for {net}".format(net="mainnet" if args.mainnet else "testnet", total=len(producers)), file=log)
 VerifyProducers(producers)
 
 bpjsons = GetBPJSONs(historyURL, producers, force=(args.bpjsons or args.producers))
-print("system: {total} url bp.json files in total for {net}".format(net="mainnet" if args.mainnet else "testnet", total=len(bpjsons['url'])))
+print("system: {total} url bp.json files in total for {net}".format(net="mainnet" if args.mainnet else "testnet", total=len(bpjsons['url'])), file=log)
 VerifyBPJSONs(bpjsons)
 
 logos = GetLogos('url', producers, bpjsons, force=(args.logos or args.bpjsons or args.producers))
-print("system: {total} logo files in total for {net}".format(net="mainnet" if args.mainnet else "testnet", total=len(logos)))
+print("system: {total} logo files in total for {net}".format(net="mainnet" if args.mainnet else "testnet", total=len(logos)), file=log)
 
-if args.check:
-    print("system: Checking consistency of the producer information...")
-    CheckConsistency(producers, bpjsons, logos)
-    print("system: Consistency check complete")
+print(f"system: Checking consistency of the producer information...", file=log)
+CheckConsistency(producers, bpjsons, logos)
+print(f"system: Consistency check complete", file=log)
 
 GenerateMapInfo(producers, bpjsons, logos)
 GenerateNodeInfoTables()
 
-print("system: complete.")
+print(f"system: complete.", file=log)
+
+if args.output and len(args.output) > 0:
+    log.close()
 
 sys.exit(0)
