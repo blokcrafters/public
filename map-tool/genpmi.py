@@ -323,12 +323,6 @@ def CheckConsistency(producers, bpjsons, logos):
         producer = producers[p]
         missing = []
         display = False
-        # This shouldn't ever happen - we use the producer owner as the key to the producers.
-        # So it is Critical when it does happen.
-        if p != producer['owner']:
-            regen = True
-            display = True
-            print(f"system: + CRIT: producer owner ({producer['owner']}) does not match producer name ({p})", file=log)
         if not producer['url']:
             missing.append('url')
         if not producer['location']:
@@ -339,7 +333,7 @@ def CheckConsistency(producers, bpjsons, logos):
                 print(f"system: + WARN: producer {p} has an invalid value {producer['location']} for a country code (see ISO3166)", file=log)
         if len(missing):
             display = True
-            print(f"system: + WARN: producer {p} does not have settings for {missing}", file=log)
+            print(f"system: + WARN: producer {p} does not have a setting for {missing}", file=log)
         if display:
             print(f"system: + + producer = {producer}", file=log)
     if regen:
@@ -350,9 +344,6 @@ def CheckConsistency(producers, bpjsons, logos):
         regen = False
         for b in bpjsons[source]:
             bpjson = bpjsons[source][b]
-
-            if b != bpjson['producer_account_name']:
-                print(f"system: + INFO: producer_account_name ({bpjson['producer_account_name']}) does not match producer name ({b})", file=log)
 
             for node in bpjson['nodes']:
                 lat = node['location']['latitude']
@@ -496,18 +487,23 @@ def GenerateNodeInfoTables():
         for ts in producerActions:
             na = producerActions[ts]
             action = na['action']
-            unknowns = set()
+            unknownNodes = set()
             # Any currently existing nodes in producerNodes become tentatively deleted.
             for pnode in producerNodes[p]:
                 pnode['deleted'] = ts
             if action == 'set':
                 for node in na['data']['nodes']:
                     nodetype = node['node_type']
-                    if not nodetype in nodeTypes:
-                        unknowns.add(nodetype)
-                        continue
-                    location = node['location']
                     producerNode = {}
+                    producerNode['fuzzy'] = ''
+                    if not nodetype in nodeTypes:
+                        if nodetype.lower() in ['api', 'query']:
+                            producerNode['fuzzy'] = nodetype
+                            nodetype = 'full'
+                        else:
+                            unknownNodes.add(nodetype)
+                            continue
+                    location = node['location']
                     producerNode['timestamp'] = ts
                     producerNode['deleted'] = ''
                     producerNode['producer'] = p
@@ -527,7 +523,7 @@ def GenerateNodeInfoTables():
             elif action == 'del':
                 for pnode in producerNodes[p]:
                     pnode['deleted'] = ts
-            if len(unknowns): print(f"{p}: + has unknown node types: {unknowns}", file=log)
+            if len(unknownNodes): print(f"{p}: + has unknown node types: {unknownNodes}", file=log)
 
     print(f"system: {len(countries)} countries have nodes in them.", file=log)
     print(f"system: + countries={sorted(countries)}", file=log)
@@ -538,6 +534,7 @@ def GenerateNodeInfoTables():
         for pnode in producerNodes[p]:
             if pnode['deleted'] == '':
                 nodesByCountry[pnode['location']['country']].append(pnode)
+                if len(pnode['fuzzy']): print(f"{p}: + has fuzzy node type: {pnode['fuzzy']}", file=log)
     nbcFilename = "nodes-by-country-{net}.txt".format(net="mainnet" if args.mainnet else "testnet")
     with open(nbcFilename, "w") as f:
         print(f"# This data was collected at: {datetime.datetime.utcnow()} UTC", file=f)
