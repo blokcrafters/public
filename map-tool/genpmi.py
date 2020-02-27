@@ -265,7 +265,11 @@ def UpdateLogo(source, p, force):
 
                     if updateLogoFile:
                         print(f"{p}: updating logo cache file ({logoFile}) from {url}", file=log)
-                        r = requests.get(url)
+                        try:
+                            r = requests.get(url)
+                        except:
+                            print(f"{p}: Unexpected error retrieving url={url}", file=log)
+                            return logo
                         if 'Last-Modified' in r.headers:
                             urlTime = r.headers['Last-Modified']
                         else:
