@@ -13,14 +13,17 @@ do recommend keeping a backup copy of your config.ini file if you choose to do t
 Most Guilds have private peering nodes that may be in the config.ini file - place these before the start/end block marker lines
 and they will be left intact.
 
-Recommended use:  waxpeers -n 10
+Recommended use:  waxpeers -c waxtest -n 10
 
 ```
-usage: waxpeers [-h] -n NPEERS [-i INCONFIG] [-o OUTCONFIG] [-p PINGS]
+usage: waxpeers [-h] -c CHAIN -n NPEERS [-i INCONFIG] [-o OUTCONFIG] [-p PINGS]
                 [-t TIMEOUT]
 
 optional arguments:
   -h, --help            show this help message and exit
+  -c CHAIN, --chain CHAIN
+                        chain to get the peers for. Currently either wax or
+                        waxtest. (default: None)
   -n NPEERS, --npeers NPEERS
                         The number of peers to include in the new p2p-peer-
                         address list. 0 means all that answer pings. (default:
