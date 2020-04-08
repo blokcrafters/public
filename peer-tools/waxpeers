@@ -177,8 +177,11 @@ if args.inconfig:
 # Create a temp file for the new config output
 if args.outconfig:
     path = os.path.abspath(args.outconfig)
+    oldmask = os.umask(0)
     tmpFile = tempfile.NamedTemporaryFile(delete=False, dir=os.path.dirname(path), prefix='new.', suffix='.tmp')
     tmpFile.close()
+    os.chmod(tmpFile.name, 0o666 & ~oldmask)
+    os.umask(oldmask)
     with open(tmpFile.name, 'w')  as outFile:
         for line in outputLines:
             print(line, file=outFile)
