@@ -1,3 +1,7 @@
+# waxpeers
+
+This python script will download the list of peers from validate.eosnation.io and ping each of the peers recording the average response time.  It then will create a list of the peers in response time order (fastest first) for you to include into your nodeos config.ini file.  Optionally, it will edit the config.ini file by appending the new list to the end of the file.  It checks for markers from previous runs and will replace those lines if found.  Nothing else will be changed in the config file.
+
 ```
 usage: waxpeers [-h] -n NPEERS [-i INCONFIG] [-o OUTCONFIG] [-p PINGS]
                 [-t TIMEOUT]
