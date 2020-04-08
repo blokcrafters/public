@@ -1,3 +1,4 @@
+'''
 usage: waxpeers [-h] -n NPEERS [-i INCONFIG] [-o OUTCONFIG] [-p PINGS]
                 [-t TIMEOUT]
 
@@ -28,3 +29,4 @@ operation of this program please do not modify the marker lines or the lines
 in between. If the input config and output config files are the same name, a
 safe method of generating a new modified config file will be used. If an
 output config file is not specified then stdout will be used.
+'''
