@@ -68,6 +68,7 @@ If the input config and output config files are the same name, a safe method of 
 If an output config file is not specified then stdout will be used.
 '''
 argparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, epilog=additionalHelp)
+argparser.add_argument('-c', '--chain', required=True, help='chain to get the peers for.  Currently either wax or waxtest.')
 argparser.add_argument('-n', '--npeers', type=int, default=0, required=True, help='The number of peers to include in the new p2p-peer-address list.  0 means all that answer pings.')
 argparser.add_argument('-i', '--inconfig', help='The pathname of the nodeos config.ini file to read for non- p2p-peer-address settings.')
 argparser.add_argument('-o', '--outconfig', help='The pathname of the nodeos config.ini file to write out with p2p-peer-address information added.')
@@ -80,14 +81,16 @@ args = argparser.parse_args()
 #cfgparser.optionxform = str
 #cfgparser.read_file(open(f"conf/{iam}.cfg"))
 # The following should go in the config file:
-chain = 'wax'
-endpoints = f"https://validate.eosnation.io/{chain}/reports/config.txt"
+endpoints = f"https://validate.eosnation.io/{args.chain}/reports/config.txt"
 
 # Get the list of peer hosts to ping
 headerlines = []
 peers = []
 curl = f"curl -Lsf {endpoints}"
 process = subprocess.run(shlex.split(curl), stdout=subprocess.PIPE)
+if process.returncode != 0:
+    print(f"The return code from the command {curl} was: {process.returncode}.  Cannot continue.", file=sys.stderr)
+    sys.exit(1)
 lineno = 0
 headermode = True
 for bline in process.stdout.splitlines():
