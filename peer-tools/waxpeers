@@ -47,7 +47,8 @@ def ExitSignaled(signum, frame):
 def OutputPeers(output):
     print(StartBlockLine, file=output)
     print(StartBlockContinuation, file=output)
-    print(headerlines, file=output)
+    for line in headerlines:
+        print(line, file=output)
     numberPeers = 0
     for peer in peersbytime:
         print(f"p2p-peer-address = {peer['peer']}", file=output)
