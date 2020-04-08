@@ -1,0 +1,187 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+import time
+import datetime
+import subprocess
+import argparse
+import configparser
+import shlex
+import threading
+import tempfile
+
+class waxping (threading.Thread):
+    def __init__(self, threadID, host, timeout, count):
+        threading.Thread.__init__(self)
+        self.threadID = threadID
+        self.host = host
+        self.timeout = timeout
+        self.count = count
+        self.avgtime = -1.0
+        self.done = False
+    def run(self):
+        hostparts = self.host.split(':')
+        pinghost = hostparts[0]
+        command = f"ping -q -n -W {self.timeout} -c {self.count} {pinghost}"
+        process = subprocess.run(shlex.split(command), stdout=subprocess.PIPE)
+        for bline in process.stdout.splitlines():
+            line = bline.decode('utf-8')
+            if len(line):
+                if line.startswith('rtt min/avg/max/mdev ='):
+                    labeltimes = line.strip().split('=')
+                    times = labeltimes[1].split('/')
+                    self.avgtime = float(times[1].strip())
+
+class ServiceExit(Exception):
+    """
+    Custom exception which is used to trigger the clean exit
+    of all running threads and the main program.
+    """
+    pass
+
+def ExitSignaled(signum, frame):
+    print(f"Signal {signum} caught.", flush=True, file=sys.stderr)
+    raise ServiceExit
+
+def OutputPeers(output):
+    print(StartBlockLine, file=output)
+    print(StartBlockContinuation, file=output)
+    numberPeers = 0
+    for peer in peersbytime:
+        print(f"p2p-peer-address = {peer['peer']}", file=output)
+        numberPeers += 1
+        if args.npeers and numberPeers >= args.npeers:
+            break
+    print(EndBlockLine, file=output)
+
+
+# MAIN
+iam = os.path.basename(__file__)
+
+additionalHelp = '''
+NOTE:  Well Known Text Line Markers are used to mark a block for this program.
+They will be added to the end of the output if they do not previously exist.
+The marked block will be stripped from the input when present.
+For proper operation of this program please do not modify the marker lines or the lines in between.
+If the input config and output config files are the same name, a safe method of generating a new modified config file will be used.
+If an output config file is not specified then stdout will be used.
+'''
+argparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, epilog=additionalHelp)
+argparser.add_argument('-n', '--npeers', type=int, default=0, required=True, help='The number of peers to include in the new p2p-peer-address list.  0 means all that answer pings.')
+argparser.add_argument('-i', '--inconfig', help='The pathname of the nodeos config.ini file to read for non- p2p-peer-address settings.')
+argparser.add_argument('-o', '--outconfig', help='The pathname of the nodeos config.ini file to write out with p2p-peer-address information added.')
+argparser.add_argument('-p', '--pings', type=int, default=10, help='How many pings to send to each peer for computing an average')
+argparser.add_argument('-t', '--timeout', type=int, default=5, help='The timeout in seconds to wait for replies from each peer')
+args = argparser.parse_args()
+
+# Read the config
+#cfgparser = configparser.ConfigParser()
+#cfgparser.optionxform = str
+#cfgparser.read_file(open(f"conf/{iam}.cfg"))
+# The following should go in the config file:
+chain = 'wax'
+endpoints = f"https://validate.eosnation.io/{chain}/reports/config.txt"
+
+# Get the list of peer hosts to ping
+headerlines = []
+peers = []
+curl = f"curl -Lsf {endpoints}"
+process = subprocess.run(shlex.split(curl), stdout=subprocess.PIPE)
+lineno = 0
+headermode = True
+for bline in process.stdout.splitlines():
+    lineno += 1
+    line = bline.decode('utf-8')
+    if len(line) == 0:
+        headermode = False
+    if len(line) > 0:
+        if headermode:
+            if line[0] == '#':
+                headerlines.append(line)
+            else:
+                headermode = False
+        if line.startswith('p2p-peer-address = '):
+            addrparts = line.split('=')
+            peers.append(addrparts[1].strip())
+
+#print(f"{len(headerlines)} lines of header:", file=sys.stderr)
+#print(headerlines, file=sys.stderr)
+#print(f"{len(peers)} peers:", file=sys.stderr)
+#print(peers, file=sys.stderr)
+
+threads = []
+id = 1
+for peer in peers:
+    t = waxping(id, peer, timeout=args.timeout, count=args.pings)
+    t.start()
+    threads.append(t)
+    id += 1
+
+numberDone = 0
+while True:
+    for t in threads:
+        if not t.is_alive() and not t.done:
+            numberDone += 1
+            t.done = True
+    if numberDone >= len(threads):
+        break
+    time.sleep(0.1)
+
+for t in threads:
+    t.join()
+
+peertimes = []
+for t in threads:
+    if t.avgtime != -1.0:
+        peertime = {}
+        peertime['peer'] = t.host
+        peertime['time'] = t.avgtime
+        peertimes.append(peertime)
+
+peersbytime = sorted(peertimes, key=lambda pt: pt['time'])
+
+StartBlockLine = f"# START OF {iam} p2p-peer-address BLOCK"
+StartBlockContinuation = f"# DO NOT EDIT BETWEEN THE START BLOCK LINE AND THE END BLOCK LINE\n"
+StartBlockContinuation += f"# {iam} configured p2p-peer-address lines for nodeos config.ini\n"
+StartBlockContinuation += f"# Time of configuration: {datetime.datetime.now().astimezone().replace(microsecond=0).isoformat()}"
+EndBlockLine = f"# END OF {iam} p2p-peer-address BLOCK"
+
+outputLines = []
+if args.inconfig:
+    with open(args.inconfig) as inconfig:
+        inBlock = False
+        for line in inconfig:
+            line = line.rstrip('\n')
+            if line == StartBlockLine:
+                if inBlock:
+                    print("Malformed input config file: Multiple Start Blocks", file=sys.stderr)
+                    sys.exit(1)
+                inBlock = True
+                continue
+            if inBlock and line == EndBlockLine:
+                inBlock = False
+                continue
+            if line == EndBlockLine:
+                print("Malformed input config file: End Block without Start Block", file=sys.stderr)
+                sys.exit(1)
+            if inBlock:
+                continue
+            outputLines.append(line)
+
+# Create a temp file for the new config output
+if args.outconfig:
+    path = os.path.abspath(args.outconfig)
+    tmpFile = tempfile.NamedTemporaryFile(delete=False, dir=os.path.dirname(path), prefix='new.', suffix='.tmp')
+    tmpFile.close()
+    with open(tmpFile.name, 'w')  as outFile:
+        for line in outputLines:
+            print(line, file=outFile)
+        OutputPeers(outFile)
+    os.rename(tmpFile.name, args.outconfig)
+else:
+    for line in outputLines:
+        print(line, file=sys.stdout)
+    OutputPeers(sys.stdout)
+
+sys.exit(0)
