@@ -23,7 +23,7 @@ auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
 auth.set_access_token(access_token, access_token_secret) 
 api = tweepy.API(auth) 
 
-url = "https://api.blokcrafters.io/v2/history/get_actions?account=eosio.ram&sort=desc&simple=true"
+url = "https://api.blokcrafters.io/v2/history/get_actions?account=eosio.names&sort=desc&simple=true"
 response = urllib2.urlopen(url)
 data = response.read()
 json_result = json.loads(data)
@@ -41,17 +41,16 @@ for item in json_result['simple_actions']:
     minutes = divmod(time_diff.seconds, 60) 
     #print('Difference in minutes: ', minutes[0], 'minutes', minutes[1], 'seconds')
     diff_in_min = minutes[0]
-    #print("diff_in_min==",diff_in_min)
+    #print(diff_in_min)
 
     display_symb = (item['data']['symbol'])
     bid_from = (item['data']['from'])
     bid_to = (item['data']['to'])
     memo = (item['data']['memo'])
     amt = (item['data']['amount'])
-    #print("amt=",amt)
-
-    if ( (diff_in_min < 7) and (amt > 49999) and (memo.startswith('buy ram')) ):
-      t_msg = ("RAM PURCHASE\n(" + str(nbr_of_tweets) + ")" + str(bid_from) + " Paid " + str(amt) + " #WAX for RAM" )
+   
+    if ( (diff_in_min < 7) and (amt > 4999) and (memo.startswith('bid name ')) ):
+      t_msg = ("NAME BID \n" + str(bid_from) + " Paid " + str(amt) + " #WAX " +  "to " + str(bid_to) + " for the name " + str(memo).replace('bid name ','') )
       #print(t_msg)
       api.update_status(status = t_msg) 
       nbr_of_tweets = nbr_of_tweets + 1

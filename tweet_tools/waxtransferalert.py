@@ -23,7 +23,7 @@ auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
 auth.set_access_token(access_token, access_token_secret) 
 api = tweepy.API(auth) 
 
-url = "https://api.blokcrafters.io/v2/history/get_actions?account=eosio.ram&sort=desc&simple=true"
+url = "https://api.blokcrafters.io/v2/history/get_actions?account=eosio.token&sort=desc&simple=true"
 response = urllib2.urlopen(url)
 data = response.read()
 json_result = json.loads(data)
@@ -43,6 +43,7 @@ for item in json_result['simple_actions']:
     diff_in_min = minutes[0]
     #print("diff_in_min==",diff_in_min)
 
+    action = (item['action'])
     display_symb = (item['data']['symbol'])
     bid_from = (item['data']['from'])
     bid_to = (item['data']['to'])
@@ -50,8 +51,8 @@ for item in json_result['simple_actions']:
     amt = (item['data']['amount'])
     #print("amt=",amt)
 
-    if ( (diff_in_min < 7) and (amt > 49999) and (memo.startswith('buy ram')) ):
-      t_msg = ("RAM PURCHASE\n(" + str(nbr_of_tweets) + ")" + str(bid_from) + " Paid " + str(amt) + " #WAX for RAM" )
+    if ( (diff_in_min < 3) and (amt > 399999) and (action == "transfer") ):
+      t_msg = ("WHALE TRANSFER\n (" + str(nbr_of_tweets) + ")" + str(bid_from) + " Transfered " + str(amt) + " #WAX " +  "to " + str(bid_to) )
       #print(t_msg)
       api.update_status(status = t_msg) 
       nbr_of_tweets = nbr_of_tweets + 1
