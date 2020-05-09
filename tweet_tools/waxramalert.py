@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 #
 # blokcrafters getting account status
 # bid amount over 1000 > with twitter notification
