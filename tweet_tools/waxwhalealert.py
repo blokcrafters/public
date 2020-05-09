@@ -1,10 +1,9 @@
-#!/usr/bin/env python3
 #
 # blokcrafters getting account status
 # bid amount over 1000 > with twitter notification
 #
 import json
-import urllib2
+import urllib
 import time
 import datetime
 import dateutil.parser
@@ -25,7 +24,7 @@ auth.set_access_token(access_token, access_token_secret)
 api = tweepy.API(auth) 
 
 url = "https://api.blokcrafters.io/v2/history/get_actions?account=eosio.names&sort=desc&simple=true"
-response = urllib2.urlopen(url)
+response = urllib.urlopen(url)
 data = response.read()
 json_result = json.loads(data)
 #now time_stamp 
