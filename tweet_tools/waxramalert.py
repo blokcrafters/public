@@ -1,9 +1,10 @@
+#!/usr/bin/env python3
 #
 # blokcrafters getting account status
 # bid amount over 1000 > with twitter notification
 #
 import json
-import urllib
+import urllib.request
 import time
 import datetime
 import dateutil.parser
@@ -17,14 +18,14 @@ consumer_secret ="mOjCEKdBj7aTYZo40WQMYQRBOdkKgxaiTJVCPTAlhtFW5yBkf8"
 access_token ="1234276592303644675-Wo9kKoOb9IpQYpBKeXEUdAo6vpxOpc"
 access_token_secret ="1sBdgUCZygyNTbCZG1UV9aj7VnS91aXMsURgYJhSZktJr"
 # tweet authentication of consumer key and secret 
-auth = tweepy.OAuthHandler(consumer_key, consumer_secret) 
+auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
 
 # tweet authentication of access token and secret 
-auth.set_access_token(access_token, access_token_secret) 
-api = tweepy.API(auth) 
+auth.set_access_token(access_token, access_token_secret)
+api = tweepy.API(auth)
 
 url = "https://api.blokcrafters.io/v2/history/get_actions?account=eosio.ram&sort=desc&simple=true"
-response = urllib.urlopen(url)
+response = urllib.request.urlopen(url)
 data = response.read()
 json_result = json.loads(data)
 #now time_stamp 
