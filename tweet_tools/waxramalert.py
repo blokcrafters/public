@@ -13,10 +13,10 @@ import dateutil.parser
 import tweepy
 
 # tweet personal details 
-consumer_key ="iWZ7GKeWIwGEyG2s00VfzZ2QR"
-consumer_secret ="mOjCEKdBj7aTYZo40WQMYQRBOdkKgxaiTJVCPTAlhtFW5yBkf8"
-access_token ="1234276592303644675-Wo9kKoOb9IpQYpBKeXEUdAo6vpxOpc"
-access_token_secret ="1sBdgUCZygyNTbCZG1UV9aj7VnS91aXMsURgYJhSZktJr"
+consumer_key ="iW....QR"
+consumer_secret ="mO....f8"
+access_token ="12....pc"
+access_token_secret ="1s....Jr"
 # tweet authentication of consumer key and secret 
 auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
 
