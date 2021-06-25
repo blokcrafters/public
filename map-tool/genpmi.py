@@ -246,7 +246,7 @@ def UpdateLogo(source, p, force):
             urlTime = ''
             try:
               fileMTime = datetime.datetime.utcfromtimestamp(os.path.getmtime(logoFile))
-              r = requests.head(url)
+              r = requests.head(url, timeout=5, allow_redirects=True)
               if 'Last-Modified' in r.headers:
                 urlTime = r.headers['Last-Modified']
                 urlDate = dateutil.parser.parse(urlTime, ignoretz=True)
@@ -259,11 +259,14 @@ def UpdateLogo(source, p, force):
             except FileNotFoundError:
               print(f"{p}: url bp.json cache file ({logoFile}) is missing", file=log)
               updateLogoFile = True
+            except requests.ConnectionError as e:
+              print(f"{p}: url bp.json cache file ({logoFile}): ConnectionError exception: {e}", file=log)
+              updateLogoFile = True
 
           if updateLogoFile:
             print(f"{p}: updating logo cache file ({logoFile}) from {url}", file=log)
             try:
-              r = requests.get(url)
+              r = requests.get(url, None, timeout=5)
             except:
               print(f"{p}: Unexpected error retrieving url={url}", file=log)
               return logo
@@ -505,13 +508,25 @@ def GenerateNodeInfoTables():
           nodetype = node['node_type']
           producerNode = {}
           producerNode['fuzzy'] = ''
-          if not nodetype in nodeTypes:
-            if nodetype.lower() in ['api', 'query']:
-              producerNode['fuzzy'] = nodetype
-              nodetype = 'full'
-            else:
-              unknownNodes.add(nodetype)
-              continue
+          if isinstance(nodetype, list):
+            node_types = nodetype
+            for nodetype in node_types:
+              if not nodetype in nodeTypes:
+                if nodetype.lower() in ['api', 'query']:
+                  producerNode['fuzzy'] = nodetype
+                  nodetype = 'full'
+                  break
+                else:
+                  unknownNodes.add(nodetype)
+                  continue
+          else:
+            if not nodetype in nodeTypes:
+              if nodetype.lower() in ['api', 'query']:
+                producerNode['fuzzy'] = nodetype
+                nodetype = 'full'
+              else:
+                unknownNodes.add(nodetype)
+                continue
           location = node['location']
           producerNode['timestamp'] = ts
           producerNode['deleted'] = ''
@@ -575,8 +590,8 @@ else:
 #historyURL = "https://api.waxsweden.org" if args.mainnet else "https://testnet.waxsweden.org"
 #chainURL = "https://chain.wax.io" if args.mainnet else "https://testnet.blokcrafters.io"
 #historyURL = "https://api.blokcrafters.io" if args.mainnet else "https://testnet.blokcrafters.io"
-chainURL = "https://wax.blokcrafters.io" if args.mainnet else "https://wax-test.blokcrafters.io"
-historyURL = "https://wax.blokcrafters.io" if args.mainnet else "https://wax-test.blokcrafters.io"
+chainURL = "https://wax.blokcrafters.io" if args.mainnet else "https://testnet.waxsweden.org"
+historyURL = "https://wax.blokcrafters.io" if args.mainnet else "https://testnet.waxsweden.org"
 producersFilename = "{net}-jsons/producers.json".format(net="mainnet" if args.mainnet else "testnet")
 top21Filename = "{net}-jsons/top21.json".format(net="mainnet" if args.mainnet else "testnet")
 
