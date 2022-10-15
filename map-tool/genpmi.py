@@ -21,6 +21,9 @@ PRODUCERJSON_ACTIONS_FILE_MAXAGE = 3600
 # The maximum age of the urls-last-checked file in seconds before allowing to recheck the bp.json URLs
 URLSLASTCHECKED_FILE_MAXAGE = 3600
 
+def dirExists(filename):
+  return os.path.exists(filename) and os.path.isdir(filename)
+
 def fileExists(filename):
   return os.path.exists(filename) and os.path.isfile(filename)
 
@@ -141,7 +144,7 @@ def UpdateBPJSON(historyURL, source, p, force=False):
       info = subprocess.run(['curl', '-LSsf', '--connect-timeout', '5',
                             '-H', 'accept: application/json', '-H', 'Content-Type: application/json', gaURL], stdout=subprocess.PIPE)
       if info.returncode != 0:
-        failReasons.append(f"FAIL: {url}: curl return code {info.returncode}: {info.stdout.decode('utf-8').rstrip()}")
+        failReasons.append(f"FAIL: {gaURL}: curl return code {info.returncode}: {info.stdout.decode('utf-8').rstrip()}")
         print(f"{p}: failed", file=log)
       else:
         with open(filename, 'wb') as fh:
@@ -154,27 +157,28 @@ def UpdateBPJSON(historyURL, source, p, force=False):
 
     # Gather all the specific producer jsons from the actions into prodJSONs
     prodJSONs = {}
-    for action in theActions['actions']:
-      if p != action['act']['data']['owner']:
-        continue
-      # Verify the action name
-      if not action['act']['name'] in ('set', 'del'):
-        failReasons.append(f"{p}: + unknown action name ({action['act']['name']}) is present")
-        continue
-      dt = dateutil.parser.parse(action['@timestamp'])
-      timestamp = time.mktime(dt.timetuple()) + dt.microsecond / 1000000
-      tsJSON = {}
-      tsJSON['name'] = action['act']['name']
-      tsJSONData = ''
-      if tsJSON['name'] == 'set':
-        tsJSONData = action['act']['data']['json']
-        try:
-          tsJSON['data'] = json.loads(tsJSONData)
+    if 'actions' in theActions:
+      for action in theActions['actions']:
+        if p != action['act']['data']['owner']:
+          continue
+        # Verify the action name
+        if not action['act']['name'] in ('set', 'del'):
+          failReasons.append(f"{p}: + unknown action name ({action['act']['name']}) is present")
+          continue
+        dt = dateutil.parser.parse(action['@timestamp'])
+        timestamp = time.mktime(dt.timetuple()) + dt.microsecond / 1000000
+        tsJSON = {}
+        tsJSON['name'] = action['act']['name']
+        tsJSONData = ''
+        if tsJSON['name'] == 'set':
+          tsJSONData = action['act']['data']['json']
+          try:
+            tsJSON['data'] = json.loads(tsJSONData)
+            prodJSONs[timestamp] = tsJSON
+          except json.decoder.JSONDecodeError:
+            failReasons.append(f"{p}: chain producerjson action data @{action['@timestamp']} could not be decoded as JSON")
+        elif tsJSON['name'] == 'del':
           prodJSONs[timestamp] = tsJSON
-        except json.decoder.JSONDecodeError:
-          failReasons.append(f"{p}: chain producerjson action data @{action['@timestamp']} could not be decoded as JSON")
-      elif tsJSON['name'] == 'del':
-        prodJSONs[timestamp] = tsJSON
     print(f"{p}: {len(prodJSONs)} producjerjson actions on the chain", file=log)
     if len(prodJSONs):
       for ts, action in sorted(prodJSONs.items(), reverse=True):
@@ -214,6 +218,8 @@ def GetBPJSONs(historyURL, producers, force=False):
         bpjson = UpdateBPJSON(historyURL, source, p, force)
       elif source == 'chain':
         bpjson = UpdateBPJSON(historyURL, source, p, force)
+        if not dirExists('{net}-jsons/chain'.format(net="mainnet" if args.mainnet else "testnet")):
+          os.mkdir('{net}-jsons/chain'.format(net="mainnet" if args.mainnet else "testnet"))
         f = open("{net}-jsons/chain/{producer}-bp.json".format(net="mainnet" if args.mainnet else "testnet", producer=p), 'w')
         json.dump(bpjson, f, indent=2)
         f.close()
@@ -590,8 +596,10 @@ else:
 #historyURL = "https://api.waxsweden.org" if args.mainnet else "https://testnet.waxsweden.org"
 #chainURL = "https://chain.wax.io" if args.mainnet else "https://testnet.blokcrafters.io"
 #historyURL = "https://api.blokcrafters.io" if args.mainnet else "https://testnet.blokcrafters.io"
-chainURL = "https://wax.blokcrafters.io" if args.mainnet else "https://testnet.waxsweden.org"
-historyURL = "https://wax.blokcrafters.io" if args.mainnet else "https://testnet.waxsweden.org"
+#chainURL = "https://wax.blokcrafters.io" if args.mainnet else "https://testnet.waxsweden.org"
+#historyURL = "https://wax.blokcrafters.io" if args.mainnet else "https://testnet.waxsweden.org"
+chainURL = "https://wax.blokcrafters.io" if args.mainnet else "https://testnet.wax.pink.gg"
+historyURL = "https://wax.blokcrafters.io" if args.mainnet else "https://testnet.wax.pink.gg"
 producersFilename = "{net}-jsons/producers.json".format(net="mainnet" if args.mainnet else "testnet")
 top21Filename = "{net}-jsons/top21.json".format(net="mainnet" if args.mainnet else "testnet")
 
