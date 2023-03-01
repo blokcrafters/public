@@ -598,8 +598,10 @@ else:
 #historyURL = "https://api.blokcrafters.io" if args.mainnet else "https://testnet.blokcrafters.io"
 #chainURL = "https://wax.blokcrafters.io" if args.mainnet else "https://testnet.waxsweden.org"
 #historyURL = "https://wax.blokcrafters.io" if args.mainnet else "https://testnet.waxsweden.org"
-chainURL = "https://wax.blokcrafters.io" if args.mainnet else "https://testnet.wax.pink.gg"
-historyURL = "https://wax.blokcrafters.io" if args.mainnet else "https://testnet.wax.pink.gg"
+#chainURL = "https://wax.blokcrafters.io" if args.mainnet else "https://testnet.wax.pink.gg"
+#historyURL = "https://wax.blokcrafters.io" if args.mainnet else "https://testnet.wax.pink.gg"
+chainURL = "https://wax.blokcrafters.io" if args.mainnet else "https://wax-test.blokcrafters.io"
+historyURL = "https://wax.blokcrafters.io" if args.mainnet else "https://wax-test.blokcrafters.io"
 producersFilename = "{net}-jsons/producers.json".format(net="mainnet" if args.mainnet else "testnet")
 top21Filename = "{net}-jsons/top21.json".format(net="mainnet" if args.mainnet else "testnet")
 
