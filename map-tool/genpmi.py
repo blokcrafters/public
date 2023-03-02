@@ -268,6 +268,9 @@ def UpdateLogo(source, p, force):
             except requests.ConnectionError as e:
               print(f"{p}: url bp.json cache file ({logoFile}): ConnectionError exception: {e}", file=log)
               updateLogoFile = True
+            except requests.exceptions.ReadTimeout as e:
+              print(f"{p}: url bp.json cache file ({logoFile}): ReadTimeoutError exception: {e}", file=log)
+              updateLogoFile = True
 
           if updateLogoFile:
             print(f"{p}: updating logo cache file ({logoFile}) from {url}", file=log)
@@ -463,8 +466,19 @@ def FilterNodeActionsByProducer(nodeActions, producer):
   fna = {}
   for ts in nodeActions:
     na = nodeActions[ts]
-    if na['data']['producer_account_name'] == producer:
-      fna[ts] = na
+#    print(f'XXXXXXXXXX na={na}', file=log)
+    if 'producer_account_name' in na['data']:
+#      print(f"system: na['data'] HAS producer_account_name", file=log)
+      if na['data']['producer_account_name'] == producer:
+        fna[ts] = na
+    else:
+#      print(f"system: na['data'] is missing producer_account_name", file=log)
+      if 'json' in na['data']:
+        na_data_json = json.loads(na['data']['json'])
+        if 'producer_account_name' in na_data_json:
+#          print(f"system: na['data'] BUT HAS producer_account_name in json", file=log)
+          if na_data_json['producer_account_name'] == producer:
+            fna[ts] = na
   return fna
 
 def GenerateNodeInfoTables():
@@ -509,8 +523,18 @@ def GenerateNodeInfoTables():
       # Any currently existing nodes in producerNodes become tentatively deleted.
       for pnode in producerNodes[p]:
         pnode['deleted'] = ts
+      nodes = []
       if action == 'set':
-        for node in na['data']['nodes']:
+        if 'nodes' in na['data']:
+          nodes = na['data']['nodes']
+        else:
+          if 'json' in na['data']:
+            na_data_json = json.loads(na['data']['json'])
+            if 'nodes' in na_data_json:
+              nodes = na_data_json['nodes']
+        if len(nodes) == 0:
+          print(f'XXXXXX Could not find any nodes for producer {p}', file=log)
+        for node in nodes:
           nodetype = node['node_type']
           producerNode = {}
           producerNode['fuzzy'] = ''
